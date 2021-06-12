@@ -65,7 +65,7 @@ const defaultState = {
     },
 
     // Content
-    [SETTINGS.SHOW_MATURE]: false,
+    [SETTINGS.SHOW_MATURE]: true,
     [SETTINGS.AUTOPLAY]: true,
     [SETTINGS.AUTOPLAY_NEXT]: true,
     [SETTINGS.FLOATING_PLAYER]: true,

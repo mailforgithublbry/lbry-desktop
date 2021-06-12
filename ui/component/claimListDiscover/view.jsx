@@ -202,6 +202,7 @@ function ClaimListDiscover(props: Props) {
     page: number,
     no_totals: boolean,
     any_tags?: Array<string>,
+    all_tags: Array<string>,
     any_languages?: Array<string>,
     not_tags: Array<string>,
     channel_ids?: Array<string>,
@@ -234,6 +235,8 @@ function ClaimListDiscover(props: Props) {
         ? CS.ORDER_BY_NEW_VALUE
         : CS.ORDER_BY_TOP_VALUE, // Sort by top
   };
+
+  options.all_tags = ['mature'];
 
   if (hasSource || (!ENABLE_NO_SOURCE_CLAIMS && (!claimType || claimType === CS.CLAIM_STREAM))) {
     options.has_source = true;
