@@ -1,35 +1,25 @@
 // @flow
 import * as PAGES from 'constants/pages';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import classnames from 'classnames';
 import analytics from 'analytics';
 import { buildURI, parseURI } from 'lbry-redux';
 import { SIMPLE_SITE } from 'config';
 import Router from 'component/router/index';
-import ModalRouter from 'modal/modalRouter';
 import ReactModal from 'react-modal';
 import { openContextMenu } from 'util/context-menu';
 import useKonamiListener from 'util/enhanced-layout';
-import Yrbl from 'component/yrbl';
 import FileRenderFloating from 'component/fileRenderFloating';
 import { withRouter } from 'react-router';
 import usePrevious from 'effects/use-previous';
-import Nag from 'component/common/nag';
 import REWARDS from 'rewards';
 import usePersistedState from 'effects/use-persisted-state';
-import FileDrop from 'component/fileDrop';
-import NagContinueFirstRun from 'component/nagContinueFirstRun';
 import Spinner from 'component/spinner';
-import SyncFatalError from 'component/syncFatalError';
 // @if TARGET='app'
 import useZoom from 'effects/use-zoom';
 import useHistoryNav from 'effects/use-history-nav';
 // @endif
 // @if TARGET='web'
-import OpenInAppLink from 'web/component/openInAppLink';
-import YoutubeWelcome from 'web/component/youtubeReferralWelcome';
-import NagDegradedPerformance from 'web/component/nag-degraded-performance';
-import NagDataCollection from 'web/component/nag-data-collection';
 import {
   useDegradedPerformance,
   STATUS_OK,
@@ -39,6 +29,33 @@ import {
 } from 'web/effects/use-degraded-performance';
 // @endif
 import LANGUAGE_MIGRATIONS from 'constants/language-migrations';
+
+const FileDrop = React.lazy(() => import('component/fileDrop' /* webpackChunkName: "secondary" */));
+const ModalRouter = React.lazy(() => import('modal/modalRouter' /* webpackChunkName: "secondary" */));
+const Nag = React.lazy(() => import('component/common/nag' /* webpackChunkName: "secondary" */));
+const NagContinueFirstRun = React.lazy(() =>
+  import('component/nagContinueFirstRun' /* webpackChunkName: "secondary" */)
+);
+const OpenInAppLink = React.lazy(() => import('web/component/openInAppLink' /* webpackChunkName: "secondary" */));
+
+// @if TARGET='web'
+const NagDataCollection = React.lazy(() =>
+  import('web/component/nag-data-collection' /* webpackChunkName: "secondary" */)
+);
+const NagDegradedPerformance = React.lazy(() =>
+  import('web/component/nag-degraded-performance' /* webpackChunkName: "secondary" */)
+);
+const NagNoUser = React.lazy(() => import('web/component/nag-no-user' /* webpackChunkName: "nag-no-user" */));
+const YoutubeWelcome = React.lazy(() =>
+  import('web/component/youtubeReferralWelcome' /* webpackChunkName: "secondary" */)
+);
+// @endif
+
+const SyncFatalError = React.lazy(() => import('component/syncFatalError' /* webpackChunkName: "syncFatalError" */));
+const Yrbl = React.lazy(() => import('component/yrbl' /* webpackChunkName: "yrbl" */));
+
+// ****************************************************************************
+
 export const MAIN_WRAPPER_CLASS = 'main-wrapper';
 export const IS_MAC = navigator.userAgent.indexOf('Mac OS X') !== -1;
 
@@ -79,14 +96,16 @@ type Props = {
   isAuthenticated: boolean,
   socketConnect: () => void,
   syncLoop: (?boolean) => void,
-  syncEnabled: boolean,
   currentModal: any,
   syncFatalError: boolean,
   activeChannelClaim: ?ChannelClaim,
   myChannelUrls: ?Array<string>,
+  subscriptions: Array<Subscription>,
   setActiveChannelIfNotSet: () => void,
   setIncognito: (boolean) => void,
   fetchModBlockedList: () => void,
+  resolveUris: (Array<string>) => void,
+  fetchModAmIList: () => void,
 };
 
 function App(props: Props) {
@@ -119,6 +138,9 @@ function App(props: Props) {
     setActiveChannelIfNotSet,
     setIncognito,
     fetchModBlockedList,
+    resolveUris,
+    subscriptions,
+    fetchModAmIList,
   } = props;
 
   const appRef = useRef();
@@ -136,6 +158,8 @@ function App(props: Props) {
   // @endif
   const { pathname, hash, search } = props.location;
   const [upgradeNagClosed, setUpgradeNagClosed] = useState(false);
+  const [resolvedSubscriptions, setResolvedSubscriptions] = useState(false);
+  const [sidebarOpen] = usePersistedState('sidebar', true);
   const showUpgradeButton =
     (autoUpdateDownloaded || (process.platform === 'linux' && isUpgradeAvailable)) && !upgradeNagClosed;
   // referral claiming
@@ -150,6 +174,7 @@ function App(props: Props) {
   const hasNoChannels = myChannelUrls && myChannelUrls.length === 0;
   const shouldMigrateLanguage = LANGUAGE_MIGRATIONS[language];
   const hasActiveChannelClaim = activeChannelClaim !== undefined;
+  const isPersonalized = !IS_WEB || hasVerifiedEmail;
 
   let uri;
   try {
@@ -253,6 +278,7 @@ function App(props: Props) {
 
     if (hasMyChannels) {
       fetchModBlockedList();
+      fetchModAmIList();
     }
   }, [hasMyChannels, hasNoChannels, hasActiveChannelClaim, setActiveChannelIfNotSet, setIncognito]);
 
@@ -338,6 +364,16 @@ function App(props: Props) {
     }
   }, [hasVerifiedEmail, signIn, hasSignedIn]);
 
+  // batch resolve subscriptions to be used by the sideNavigation component.
+  // add it here so that it only resolves the first time, despite route changes.
+  // useLayoutEffect because it has to be executed before the sideNavigation component requests them
+  useLayoutEffect(() => {
+    if (sidebarOpen && isPersonalized && subscriptions && !resolvedSubscriptions) {
+      setResolvedSubscriptions(true);
+      resolveUris(subscriptions.map((sub) => sub.uri));
+    }
+  }, [sidebarOpen, isPersonalized, resolvedSubscriptions, subscriptions, resolveUris, setResolvedSubscriptions]);
+
   // @if TARGET='web'
   useDegradedPerformance(setLbryTvApiStatus, user);
   // @endif
@@ -346,7 +382,7 @@ function App(props: Props) {
   // Require an internal-api user on lbry.tv
   // This also prevents the site from loading in the un-authed state while we wait for internal-apis to return for the first time
   // It's not needed on desktop since there is no un-authed state
-  if (!user) {
+  if (user === undefined) {
     return (
       <div className="main--empty">
         <Spinner delayed />
@@ -357,11 +393,13 @@ function App(props: Props) {
 
   if (syncFatalError) {
     return (
-      <SyncFatalError
-        // @if TARGET='web'
-        lbryTvApiStatus={lbryTvApiStatus}
-        // @endif
-      />
+      <React.Suspense fallback={null}>
+        <SyncFatalError
+          // @if TARGET='web'
+          lbryTvApiStatus={lbryTvApiStatus}
+          // @endif
+        />
+      </React.Suspense>
     );
   }
 
@@ -377,41 +415,48 @@ function App(props: Props) {
       onContextMenu={IS_WEB ? undefined : (e) => openContextMenu(e)}
     >
       {IS_WEB && lbryTvApiStatus === STATUS_DOWN ? (
-        <Yrbl
-          className="main--empty"
-          title={__('lbry.tv is currently down')}
-          subtitle={__('My wheel broke, but the good news is that someone from LBRY is working on it.')}
-        />
+        <React.Suspense fallback={null}>
+          <Yrbl
+            className="main--empty"
+            title={__('lbry.tv is currently down')}
+            subtitle={__('My wheel broke, but the good news is that someone from LBRY is working on it.')}
+          />
+        </React.Suspense>
       ) : (
         <React.Fragment>
           <Router />
-          <ModalRouter />
-          <FileDrop />
+          <React.Suspense fallback={null}>
+            <ModalRouter />
+            <FileDrop />
+          </React.Suspense>
           <FileRenderFloating />
-          {isEnhancedLayout && <Yrbl className="yrbl--enhanced" />}
+          <React.Suspense fallback={null}>
+            {isEnhancedLayout && <Yrbl className="yrbl--enhanced" />}
 
-          {/* @if TARGET='app' */}
-          {showUpgradeButton && (
-            <Nag
-              message={__('An upgrade is available.')}
-              actionText={__('Install Now')}
-              onClick={requestDownloadUpgrade}
-              onClose={() => setUpgradeNagClosed(true)}
-            />
-          )}
-          {/* @endif */}
+            {/* @if TARGET='app' */}
+            {showUpgradeButton && (
+              <Nag
+                message={__('An upgrade is available.')}
+                actionText={__('Install Now')}
+                onClick={requestDownloadUpgrade}
+                onClose={() => setUpgradeNagClosed(true)}
+              />
+            )}
+            {/* @endif */}
 
-          {/* @if TARGET='web' */}
-          <YoutubeWelcome />
-          {!SIMPLE_SITE && !shouldHideNag && <OpenInAppLink uri={uri} />}
-          {!shouldHideNag && <NagContinueFirstRun />}
-          {(lbryTvApiStatus === STATUS_DEGRADED || lbryTvApiStatus === STATUS_FAILING) && !shouldHideNag && (
-            <NagDegradedPerformance onClose={() => setLbryTvApiStatus(STATUS_OK)} />
-          )}
-          {!SIMPLE_SITE && lbryTvApiStatus === STATUS_OK && showAnalyticsNag && !shouldHideNag && (
-            <NagDataCollection onClose={handleAnalyticsDismiss} />
-          )}
-          {/* @endif */}
+            {/* @if TARGET='web' */}
+            <YoutubeWelcome />
+            {!SIMPLE_SITE && !shouldHideNag && <OpenInAppLink uri={uri} />}
+            {!shouldHideNag && <NagContinueFirstRun />}
+            {(lbryTvApiStatus === STATUS_DEGRADED || lbryTvApiStatus === STATUS_FAILING) && !shouldHideNag && (
+              <NagDegradedPerformance onClose={() => setLbryTvApiStatus(STATUS_OK)} />
+            )}
+            {!SIMPLE_SITE && lbryTvApiStatus === STATUS_OK && showAnalyticsNag && !shouldHideNag && (
+              <NagDataCollection onClose={handleAnalyticsDismiss} />
+            )}
+            {user === null && <NagNoUser />}
+            {/* @endif */}
+          </React.Suspense>
         </React.Fragment>
       )}
     </div>

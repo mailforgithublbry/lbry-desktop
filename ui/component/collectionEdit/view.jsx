@@ -86,6 +86,7 @@ function CollectionForm(props: Props) {
     collection,
     collectionUrls,
     collectionClaimIds,
+    clearCollectionErrors,
   } = props;
   const activeChannelName = activeChannelClaim && activeChannelClaim.name;
   let prefix = IS_WEB ? `${DOMAIN}/` : 'lbry://';
@@ -163,6 +164,7 @@ function CollectionForm(props: Props) {
   React.useEffect(() => {
     const collectionClaimIds = JSON.parse(collectionClaimIdsString);
     setParams({ ...params, claims: collectionClaimIds });
+    clearCollectionErrors();
   }, [collectionClaimIdsString, setParams]);
 
   function handleLanguageChange(index, code) {
@@ -228,14 +230,15 @@ function CollectionForm(props: Props) {
       setParams({ ...params, channel_id: activeChannelId });
     }
   }, [activeChannelId, incognito, setParams]);
-  const itemError = !params.claims.length ? __('Cannot publish empty collection') : '';
+
+  const itemError = !params.claims.length ? __('Cannot publish empty list') : '';
   const submitError = nameError || bidError || itemError || updateError || createError;
 
   return (
     <>
       <div className={classnames('main--contained', { 'card--disabled': disabled })}>
         <Tabs>
-          <TabList className="tabs__list--channel-page">
+          <TabList className="tabs__list--collection-edit-page">
             <Tab>{__('General')}</Tab>
             <Tab>{__('Items')}</Tab>
             <Tab>{__('Credits')}</Tab>
@@ -264,7 +267,7 @@ function CollectionForm(props: Props) {
                           autoFocus={isNewCollection}
                           type="text"
                           name="channel_name"
-                          placeholder={__('MyAwesomeCollection')}
+                          placeholder={__('MyAwesomeList')}
                           value={params.name}
                           error={nameError}
                           disabled={!isNewCollection}
@@ -279,7 +282,7 @@ function CollectionForm(props: Props) {
                         type="text"
                         name="channel_title2"
                         label={__('Title')}
-                        placeholder={__('My Awesome Collection')}
+                        placeholder={__('My Awesome List')}
                         value={params.title}
                         onChange={(e) => setParams({ ...params, title: e.target.value })}
                       />
@@ -303,11 +306,7 @@ function CollectionForm(props: Props) {
               </div>
             </TabPanel>
             <TabPanel>
-              <ClaimList
-                uris={collectionUrls}
-                collectionId={collectionId}
-                empty={__('This collection has no items.')}
-              />
+              <ClaimList uris={collectionUrls} collectionId={collectionId} empty={__('This list has no items.')} />
             </TabPanel>
             <TabPanel>
               <Card

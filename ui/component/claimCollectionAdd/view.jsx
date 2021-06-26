@@ -42,6 +42,7 @@ const ClaimCollectionAdd = (props: Props) => {
   function handleAddCollection() {
     addCollection(newCollectionName, [permanentUrl], isChannel ? 'collection' : 'playlist');
     setNewCollectionName('');
+    setAddNewCollection(false);
   }
 
   function altEnterListener(e: SyntheticKeyboardEvent<*>) {
@@ -60,6 +61,11 @@ const ClaimCollectionAdd = (props: Props) => {
     window.removeEventListener('keydown', altEnterListener);
   }
 
+  function handleClearNew() {
+    setNewCollectionName('');
+    setAddNewCollection(false);
+  }
+
   return (
     <Card
       title={__('Add To...')}
@@ -73,7 +79,15 @@ const ClaimCollectionAdd = (props: Props) => {
                   .filter((list) => (isChannel ? list.type === 'collection' : list.type === 'playlist'))
                   .map((l) => {
                     const { id } = l;
-                    return <CollectionSelectItem collectionId={id} uri={permanentUrl} key={id} category={'builtin'} />;
+                    return (
+                      <CollectionSelectItem
+                        claim={claim}
+                        collectionId={id}
+                        uri={permanentUrl}
+                        key={id}
+                        category={'builtin'}
+                      />
+                    );
                   })}
                 {unpublished &&
                   (Object.values(unpublished): any)
@@ -82,7 +96,13 @@ const ClaimCollectionAdd = (props: Props) => {
                     .map((l) => {
                       const { id } = l;
                       return (
-                        <CollectionSelectItem collectionId={id} uri={permanentUrl} key={id} category={'unpublished'} />
+                        <CollectionSelectItem
+                          claim={claim}
+                          collectionId={id}
+                          uri={permanentUrl}
+                          key={id}
+                          category={'unpublished'}
+                        />
                       );
                     })}
                 {published &&
@@ -90,7 +110,13 @@ const ClaimCollectionAdd = (props: Props) => {
                     // $FlowFixMe
                     const { id } = l;
                     return (
-                      <CollectionSelectItem collectionId={id} uri={permanentUrl} key={id} category={'published'} />
+                      <CollectionSelectItem
+                        claim={claim}
+                        collectionId={id}
+                        uri={permanentUrl}
+                        key={id}
+                        category={'published'}
+                      />
                     );
                   })}
               </div>
@@ -103,27 +129,36 @@ const ClaimCollectionAdd = (props: Props) => {
                 type="text"
                 name="new_collection"
                 value={newCollectionName}
-                label={'New List Title'}
+                label={__('New List Title')}
                 onFocus={onTextareaFocus}
                 onBlur={onTextareaBlur}
                 inputButton={
-                  <Button
-                    button={'secondary'}
-                    icon={ICONS.ADD}
-                    disabled={!newCollectionName.length}
-                    onClick={() => handleAddCollection()}
-                    ref={buttonref}
-                  />
+                  <>
+                    <Button
+                      button={'alt'}
+                      icon={ICONS.ADD}
+                      className={'button-toggle'}
+                      disabled={!newCollectionName.length}
+                      onClick={() => handleAddCollection()}
+                      ref={buttonref}
+                    />
+                    <Button
+                      button={'alt'}
+                      className={'button-toggle'}
+                      icon={ICONS.REMOVE}
+                      onClick={() => handleClearNew()}
+                    />
+                  </>
                 }
                 onChange={handleNameInput}
               />
             )}
             {!addNewCollection && (
-              <Button button={'link'} label={'New List'} onClick={() => setAddNewCollection(true)} />
+              <Button button={'link'} label={__('New List')} onClick={() => setAddNewCollection(true)} />
             )}
           </fieldset-section>
           <div className="card__actions">
-            <Button button="secondary" label={__('Done')} onClick={closeModal} />
+            <Button button="secondary" label={__('Done')} disabled={addNewCollection} onClick={closeModal} />
           </div>
         </div>
       }

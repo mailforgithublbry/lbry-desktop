@@ -5,7 +5,7 @@ import React from 'react';
 import FreezeframeWrapper from './FreezeframeWrapper';
 import Placeholder from './placeholder.png';
 import classnames from 'classnames';
-import useLazyLoading from 'effects/use-lazy-loading';
+import Thumb from './thumb';
 
 type Props = {
   uri: string,
@@ -19,12 +19,14 @@ type Props = {
 
 function FileThumbnail(props: Props) {
   const { claim, uri, doResolveUri, thumbnail: rawThumbnail, children, allowGifs = false, className } = props;
+
   const passedThumbnail = rawThumbnail && rawThumbnail.trim().replace(/^http:\/\//i, 'https://');
   const thumbnailFromClaim =
     uri && claim && claim.value && claim.value.thumbnail ? claim.value.thumbnail.url : undefined;
   const thumbnail = passedThumbnail || thumbnailFromClaim;
+
   const hasResolvedClaim = claim !== undefined;
-  const thumbnailRef = React.useRef(null);
+  const isGif = thumbnail && thumbnail.endsWith('gif');
 
   React.useEffect(() => {
     if (!hasResolvedClaim && uri) {
@@ -32,9 +34,7 @@ function FileThumbnail(props: Props) {
     }
   }, [hasResolvedClaim, uri, doResolveUri]);
 
-  useLazyLoading(thumbnailRef);
-
-  if (!allowGifs && thumbnail && thumbnail.endsWith('gif')) {
+  if (!allowGifs && isGif) {
     return (
       <FreezeframeWrapper src={thumbnail} className={classnames('media__thumb', className)}>
         {children}
@@ -45,30 +45,18 @@ function FileThumbnail(props: Props) {
   let url = thumbnail || (hasResolvedClaim ? Placeholder : '');
   // @if TARGET='web'
   // Pass image urls through a compression proxy
-  if (thumbnail) {
+  if (thumbnail && !(isGif && allowGifs)) {
     url = getThumbnailCdnUrl({ thumbnail });
   }
   // @endif
 
-  const thumnailUrl = url ? url.replace(/'/g, "\\'") : '';
+  const thumbnailUrl = url ? url.replace(/'/g, "\\'") : '';
 
-  if (!hasResolvedClaim) {
-    return (
-      <div
-        ref={thumbnailRef}
-        data-background-image={thumnailUrl}
-        className={classnames('media__thumb', className, {
-          'media__thumb--resolving': !hasResolvedClaim,
-        })}
-      >
-        {children}
-      </div>
-    );
+  if (hasResolvedClaim || thumbnailUrl) {
+    return <Thumb thumb={thumbnailUrl}>{children}</Thumb>;
   }
   return (
     <div
-      ref={thumbnailRef}
-      data-background-image={thumnailUrl}
       className={classnames('media__thumb', className, {
         'media__thumb--resolving': !hasResolvedClaim,
       })}

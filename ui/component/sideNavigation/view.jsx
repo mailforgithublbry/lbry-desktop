@@ -8,6 +8,7 @@ import classnames from 'classnames';
 import Icon from 'component/common/icon';
 import NotificationBubble from 'component/notificationBubble';
 import I18nMessage from 'component/i18nMessage';
+import ChannelThumbnail from 'component/channelThumbnail';
 import { PINNED_LABEL_1, PINNED_URI_1, PINNED_URI_2, PINNED_LABEL_2, SIMPLE_SITE, DOMAIN } from 'config';
 // @if TARGET='app'
 import { IS_MAC } from 'component/app/view';
@@ -46,7 +47,6 @@ type Props = {
   doClearPurchasedUriSuccess: () => void,
   user: ?User,
   homepageData: any,
-  hasExperimentalUi: boolean,
 };
 
 type SideNavLink = {
@@ -74,7 +74,6 @@ function SideNavigation(props: Props) {
     homepageData,
     user,
     followedTags,
-    hasExperimentalUi,
   } = props;
 
   const { EXTRA_SIDEBAR_LINKS } = homepageData;
@@ -221,7 +220,7 @@ function SideNavigation(props: Props) {
 
   SIDE_LINKS.push(HOME);
   SIDE_LINKS.push(RECENT_FROM_FOLLOWING);
-  if (!SIMPLE_SITE && hasExperimentalUi) {
+  if (!SIMPLE_SITE) {
     FULL_LINKS.push({
       title: 'Lists',
       link: `/$/${PAGES.LISTS}`,
@@ -231,7 +230,7 @@ function SideNavigation(props: Props) {
   }
   if (!SIMPLE_SITE) {
     SIDE_LINKS.push(...FULL_LINKS);
-  } else if (SIMPLE_SITE && hasExperimentalUi) {
+  } else if (SIMPLE_SITE) {
     SIDE_LINKS.push({
       title: 'Lists',
       link: `/$/${PAGES.LISTS}`,
@@ -296,7 +295,12 @@ function SideNavigation(props: Props) {
             Sign up to earn %lbc% for you and your favorite creators.
           </I18nMessage>
         </span>
-        <Button button="secondary" label={__('Sign Up')} navigate={`/$/${PAGES.AUTH}?src=sidenav_nudge`} />
+        <Button
+          button="secondary"
+          label={__('Sign Up')}
+          navigate={`/$/${PAGES.AUTH}?src=sidenav_nudge`}
+          disabled={user === null}
+        />{' '}
       </div>
     );
 
@@ -364,15 +368,8 @@ function SideNavigation(props: Props) {
 
             {sidebarOpen && isPersonalized && subscriptions && subscriptions.length > 0 && (
               <ul className="navigation__secondary navigation-links">
-                {subscriptions.map(({ uri, channelName }, index) => (
-                  <li key={uri} className="navigation-link__wrapper">
-                    <Button
-                      navigate={uri}
-                      label={channelName}
-                      className="navigation-link"
-                      activeClass="navigation-link--active"
-                    />
-                  </li>
+                {subscriptions.map((subscription) => (
+                  <SubscriptionListItem key={subscription.uri} subscription={subscription} />
                 ))}
               </ul>
             )}
@@ -447,15 +444,8 @@ function SideNavigation(props: Props) {
               </ul>
               {sidebarOpen && isPersonalized && subscriptions && subscriptions.length > 0 && (
                 <ul className="navigation__secondary navigation-links">
-                  {subscriptions.map(({ uri, channelName }, index) => (
-                    <li key={uri} className="navigation-link__wrapper">
-                      <Button
-                        navigate={uri}
-                        label={channelName}
-                        className="navigation-link"
-                        activeClass="navigation-link--active"
-                      />
-                    </li>
+                  {subscriptions.map((subscription) => (
+                    <SubscriptionListItem key={subscription.uri} subscription={subscription} />
                   ))}
                 </ul>
               )}
@@ -483,6 +473,24 @@ function SideNavigation(props: Props) {
         </>
       )}
     </div>
+  );
+}
+
+function SubscriptionListItem({ subscription }: { subscription: Subscription }) {
+  const { uri, channelName } = subscription;
+  return (
+    <li className="navigation-link__wrapper">
+      <Button
+        navigate={uri}
+        className="navigation-link navigation-link--with-thumbnail"
+        activeClass="navigation-link--active"
+      >
+        <ChannelThumbnail uri={uri} hideStakedIndicator />
+        <span dir="auto" className="button__label">
+          {channelName}
+        </span>
+      </Button>
+    </li>
   );
 }
 
